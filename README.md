@@ -1,73 +1,62 @@
-# React + TypeScript + Vite
+# ChemoKids OM-AI React
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Mobile-first prototype for assessing possible oral mucositis symptoms in pediatric oncology patients.
 
-Currently, two official plugins are available:
+> Important: this app is a prototype decision-support/demo tool only. It is not a medical diagnosis system and must not replace clinical judgment.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## Tech stack
 
-## React Compiler
+- React
+- TypeScript
+- Vite
+- CSS
+- Vercel deployment
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## Local development
 
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+npm install
+npm run dev
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+## Production build check
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+Run this before pushing to GitHub/Vercel:
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+npm run build
+npm run lint
 ```
+
+## Current app flow
+
+1. Welcome screen
+2. Upload or capture an oral cavity image
+3. Answer symptom questions
+4. Simulated AI analysis screen
+5. Rule-based preliminary result
+
+## Project structure
+
+```text
+src/
+  components/
+    TopBar.tsx
+  data/
+    questions.ts
+  utils/
+    evaluateGrade.ts
+  App.tsx
+  App.css
+  index.css
+  main.tsx
+  types.ts
+```
+
+## Recommended next steps
+
+- Add real backend API route for AI-assisted image review.
+- Store assessments only after privacy requirements are clear.
+- Add export/share report button.
+- Add Thai/English language toggle.
+- Add stronger clinical disclaimer and emergency guidance.

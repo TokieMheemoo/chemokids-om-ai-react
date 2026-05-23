@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react'
 import './App.css'
 
 type Screen = 'welcome' | 'upload' | 'questions' | 'analyzing' | 'result'
@@ -62,8 +62,10 @@ function evaluateGrade(answers: Answers): Result {
     return {
       grade: 4,
       level: 'รุนแรงมาก',
-      summary: 'ผู้ป่วยไม่สามารถรับประทานอาหารหรือดื่มน้ำได้ จึงควรได้รับการประเมินโดยบุคลากรทางการแพทย์โดยเร็ว',
-      recommendation: 'แจ้งแพทย์หรือพยาบาลทันที โดยเฉพาะหากมีไข้ อ่อนเพลียมาก ปวดมาก หรือมีเลือดออกในช่องปาก',
+      summary:
+        'ผู้ป่วยไม่สามารถรับประทานอาหารหรือดื่มน้ำได้ จึงควรได้รับการประเมินโดยบุคลากรทางการแพทย์โดยเร็ว',
+      recommendation:
+        'แจ้งแพทย์หรือพยาบาลทันที โดยเฉพาะหากมีไข้ อ่อนเพลียมาก ปวดมาก หรือมีเลือดออกในช่องปาก',
       badge: 'ควรพบแพทย์ทันที',
     }
   }
@@ -72,8 +74,10 @@ function evaluateGrade(answers: Answers): Result {
     return {
       grade: 3,
       level: 'รุนแรง',
-      summary: 'พบข้อมูลว่าอาจมีแผลในช่องปากและรับประทานอาหารแข็งไม่ได้ แต่ยังรับประทานอาหารเหลวได้',
-      recommendation: 'ควรติดตามอาการใกล้ชิด เลือกอาหารอ่อนหรืออาหารเหลว และปรึกษาบุคลากรทางการแพทย์เพื่อประเมินเพิ่มเติม',
+      summary:
+        'พบข้อมูลว่าอาจมีแผลในช่องปากและรับประทานอาหารแข็งไม่ได้ แต่ยังรับประทานอาหารเหลวได้',
+      recommendation:
+        'ควรติดตามอาการใกล้ชิด เลือกอาหารอ่อนหรืออาหารเหลว และปรึกษาบุคลากรทางการแพทย์เพื่อประเมินเพิ่มเติม',
       badge: 'ควรปรึกษาบุคลากรทางการแพทย์',
     }
   }
@@ -83,7 +87,8 @@ function evaluateGrade(answers: Answers): Result {
       grade: 2,
       level: 'ปานกลาง',
       summary: 'พบลักษณะรอยแดงและแผลในช่องปาก แต่ยังสามารถรับประทานอาหารแข็งได้',
-      recommendation: 'ควรดูแลความสะอาดช่องปาก หลีกเลี่ยงอาหารเผ็ด เปรี้ยว แข็ง หรือระคายเคือง และติดตามอาการอย่างต่อเนื่อง',
+      recommendation:
+        'ควรดูแลความสะอาดช่องปาก หลีกเลี่ยงอาหารเผ็ด เปรี้ยว แข็ง หรือระคายเคือง และติดตามอาการอย่างต่อเนื่อง',
       badge: 'ติดตามอาการต่อเนื่อง',
     }
   }
@@ -93,7 +98,8 @@ function evaluateGrade(answers: Answers): Result {
       grade: 1,
       level: 'เล็กน้อย',
       summary: 'พบลักษณะรอยแดงในช่องปาก แต่ยังไม่พบข้อมูลแผลจากแบบสอบถาม',
-      recommendation: 'ควรเฝ้าระวังอาการ ดูแลช่องปากอย่างสม่ำเสมอ และประเมินซ้ำหากเริ่มมีอาการเจ็บหรือเกิดแผล',
+      recommendation:
+        'ควรเฝ้าระวังอาการ ดูแลช่องปากอย่างสม่ำเสมอ และประเมินซ้ำหากเริ่มมีอาการเจ็บหรือเกิดแผล',
       badge: 'เฝ้าระวัง',
     }
   }
@@ -102,7 +108,8 @@ function evaluateGrade(answers: Answers): Result {
     grade: 0,
     level: 'ไม่พบอาการชัดเจน',
     summary: 'ยังไม่พบข้อมูลรอยแดงหรือแผลในช่องปากจากแบบสอบถามเบื้องต้น',
-    recommendation: 'ควรดูแลสุขภาพช่องปากอย่างสม่ำเสมอ และประเมินซ้ำหากมีอาการเจ็บ แสบ หรือรับประทานอาหารลำบาก',
+    recommendation:
+      'ควรดูแลสุขภาพช่องปากอย่างสม่ำเสมอ และประเมินซ้ำหากมีอาการเจ็บ แสบ หรือรับประทานอาหารลำบาก',
     badge: 'ประเมินซ้ำเมื่อมีอาการ',
   }
 }
@@ -110,9 +117,13 @@ function evaluateGrade(answers: Answers): Result {
 function TopBar({ step }: { step: number }) {
   return (
     <div className="topbar">
-      <div>
-        <p className="eyebrow">ChemoKids OM-AI</p>
-        <h2>Mobile Assessment</h2>
+      <div className="topbar-brand">
+        <img src="/logo.png" alt="ChemoKids OM-AI Logo" className="topbar-logo" />
+
+        <div>
+          <p className="eyebrow">ChemoKids OM-AI</p>
+          <h2>Mobile Assessment</h2>
+        </div>
       </div>
 
       <span className="step-pill">Step {step}/4</span>
@@ -129,16 +140,57 @@ function App() {
   const [image, setImage] = useState<File | null>(null)
   const [answers, setAnswers] = useState<Answers>({})
 
+  const galleryInputRef = useRef<HTMLInputElement | null>(null)
+  const cameraInputRef = useRef<HTMLInputElement | null>(null)
+  const analyzeTimerRef = useRef<number | null>(null)
+
   const imagePreview = useMemo(() => {
     if (!image) return ''
     return URL.createObjectURL(image)
   }, [image])
 
-  const result = useMemo(() => evaluateGrade(answers), [answers])
+  useEffect(() => {
+    return () => {
+      if (imagePreview) {
+        URL.revokeObjectURL(imagePreview)
+      }
+    }
+  }, [imagePreview])
 
+  useEffect(() => {
+    return () => {
+      if (analyzeTimerRef.current) {
+        window.clearTimeout(analyzeTimerRef.current)
+      }
+    }
+  }, [])
+
+  const result = useMemo(() => evaluateGrade(answers), [answers])
   const isQuestionComplete = questions.every((q) => answers[q.id] !== undefined)
 
+  function handleImageUpload(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0]
+
+    if (file) {
+      setImage(file)
+    }
+
+    event.target.value = ''
+  }
+
+  function openGallery() {
+    galleryInputRef.current?.click()
+  }
+
+  function openCamera() {
+    cameraInputRef.current?.click()
+  }
+
   function restart() {
+    if (analyzeTimerRef.current) {
+      window.clearTimeout(analyzeTimerRef.current)
+    }
+
     setScreen('welcome')
     setImage(null)
     setAnswers({})
@@ -146,7 +198,8 @@ function App() {
 
   function goAnalyze() {
     setScreen('analyzing')
-    setTimeout(() => {
+
+    analyzeTimerRef.current = window.setTimeout(() => {
       setScreen('result')
     }, 1600)
   }
@@ -157,9 +210,7 @@ function App() {
         {screen === 'welcome' && (
           <div className="welcome-screen">
             <div>
-              <div className="app-icon">🩺</div>
-
-              <p className="eyebrow welcome-eyebrow">ChemoKids OM-AI</p>
+              <img src="/logo.png" alt="ChemoKids OM-AI Logo" className="hero-logo" />
 
               <h1>
                 Mobile
@@ -168,8 +219,7 @@ function App() {
               </h1>
 
               <p className="description">
-                ระบบต้นแบบสำหรับช่วยประเมินภาวะเยื่อบุช่องปากอักเสบ
-                ในผู้ป่วยเด็กมะเร็งที่ได้รับยาเคมีบำบัด
+                ระบบต้นแบบสำหรับช่วยประเมินภาวะเยื่อบุช่องปากอักเสบ ในผู้ป่วยเด็กมะเร็งที่ได้รับยาเคมีบำบัด
               </p>
 
               <div className="feature-card">📷 ถ่ายหรืออัปโหลดภาพช่องปาก</div>
@@ -178,7 +228,7 @@ function App() {
             </div>
 
             <div>
-              <button className="primary-button" onClick={() => setScreen('upload')}>
+              <button className="primary-button" type="button" onClick={() => setScreen('upload')}>
                 เริ่มประเมิน
               </button>
 
@@ -195,32 +245,43 @@ function App() {
 
             <div className="content">
               <h2 className="screen-title">อัปโหลดภาพช่องปาก</h2>
+
               <p className="description small">
                 เลือกภาพที่เห็นบริเวณแผลหรือเยื่อบุช่องปากชัดเจน แสงเพียงพอ และไม่เบลอ
               </p>
 
-              <label className="upload-box">
-                <input
-                  type="file"
-                  accept="image/*"
-                  capture="environment"
-                  hidden
-                  onChange={(event) => {
-                    const file = event.target.files?.[0]
-                    if (file) setImage(file)
-                  }}
-                />
+              <input
+                ref={galleryInputRef}
+                type="file"
+                accept="image/png,image/jpeg,image/jpg,image/webp"
+                hidden
+                onChange={handleImageUpload}
+              />
 
+              <input
+                ref={cameraInputRef}
+                type="file"
+                accept="image/*"
+                capture="environment"
+                hidden
+                onChange={handleImageUpload}
+              />
+
+              <button className="upload-box" type="button" onClick={openGallery}>
                 {imagePreview ? (
-                  <img src={imagePreview} alt="preview" className="preview-image" />
+                  <img src={imagePreview} alt="ตัวอย่างภาพช่องปากที่อัปโหลด" className="preview-image" />
                 ) : (
                   <div>
                     <div className="upload-icon">＋</div>
-                    <h3>ถ่ายภาพ / เลือกรูปภาพ</h3>
-                    <p>แตะเพื่ออัปโหลดภาพจากมือถือ</p>
+                    <h3>เลือกรูปจาก Gallery</h3>
+                    <p>แตะเพื่อเลือกรูปภาพจากมือถือ</p>
                   </div>
                 )}
-              </label>
+              </button>
+
+              <button className="secondary-button" type="button" onClick={openCamera}>
+                ถ่ายรูปใหม่ด้วยกล้อง
+              </button>
 
               <div className="warning-box">
                 <strong>คำแนะนำการถ่ายภาพ</strong>
@@ -229,13 +290,20 @@ function App() {
                 </p>
               </div>
 
-              <button
-                className="primary-button"
-                disabled={!image}
-                onClick={() => setScreen('questions')}
-              >
-                ถัดไป
-              </button>
+              <div className="button-row">
+                <button className="ghost-button" type="button" onClick={() => setScreen('welcome')}>
+                  ย้อนกลับ
+                </button>
+
+                <button
+                  className="primary-button"
+                  type="button"
+                  disabled={!image}
+                  onClick={() => setScreen('questions')}
+                >
+                  ถัดไป
+                </button>
+              </div>
             </div>
           </>
         )}
@@ -246,6 +314,7 @@ function App() {
 
             <div className="content">
               <h2 className="screen-title">แบบสอบถามอาการ</h2>
+
               <p className="description small">
                 ข้อมูลอาการจะช่วยให้ระบบประเมินร่วมกับภาพถ่ายได้เหมาะสมขึ้น
               </p>
@@ -254,14 +323,15 @@ function App() {
                 {questions.map((question, index) => (
                   <div className="question-card" key={question.id}>
                     <p className="question-number">Question {index + 1}</p>
+
                     <h3>{question.title}</h3>
+
                     <p>{question.subtitle}</p>
 
                     <div className="choice-row">
                       <button
-                        className={`choice-button ${
-                          answers[question.id] === false ? 'active' : ''
-                        }`}
+                        className={`choice-button ${answers[question.id] === false ? 'active' : ''}`}
+                        type="button"
                         onClick={() =>
                           setAnswers((prev) => ({
                             ...prev,
@@ -273,9 +343,8 @@ function App() {
                       </button>
 
                       <button
-                        className={`choice-button ${
-                          answers[question.id] === true ? 'active' : ''
-                        }`}
+                        className={`choice-button ${answers[question.id] === true ? 'active' : ''}`}
+                        type="button"
                         onClick={() =>
                           setAnswers((prev) => ({
                             ...prev,
@@ -290,13 +359,20 @@ function App() {
                 ))}
               </div>
 
-              <button
-                className="primary-button"
-                disabled={!isQuestionComplete}
-                onClick={goAnalyze}
-              >
-                วิเคราะห์ผล
-              </button>
+              <div className="button-row">
+                <button className="ghost-button" type="button" onClick={() => setScreen('upload')}>
+                  ย้อนกลับ
+                </button>
+
+                <button
+                  className="primary-button"
+                  type="button"
+                  disabled={!isQuestionComplete}
+                  onClick={goAnalyze}
+                >
+                  วิเคราะห์ผล
+                </button>
+              </div>
             </div>
           </>
         )}
@@ -311,8 +387,7 @@ function App() {
               <h2 className="screen-title">AI กำลังวิเคราะห์</h2>
 
               <p className="description small center">
-                ระบบจำลองการตรวจรอยแดง แผล และข้อมูลอาการ
-                เพื่อประเมินระดับความรุนแรงเบื้องต้น
+                ระบบจำลองการตรวจรอยแดง แผล และข้อมูลอาการ เพื่อประเมินระดับความรุนแรงเบื้องต้น
               </p>
 
               <div className="process-box">
@@ -351,11 +426,12 @@ function App() {
                 <h3>หมายเหตุสำคัญ</h3>
                 <p>
                   ผลลัพธ์นี้เป็นเพียงการช่วยประเมินเบื้องต้น ไม่ใช่การวินิจฉัยแทนแพทย์
-                  และควรให้บุคลากรทางการแพทย์ตรวจประเมินร่วมด้วยเสมอ
+                  หากผู้ป่วยมีอาการรุนแรง ปวดมาก ดื่มน้ำไม่ได้ มีไข้ เลือดออก หรืออ่อนเพลียมาก
+                  ควรติดต่อบุคลากรทางการแพทย์ทันที
                 </p>
               </div>
 
-              <button className="secondary-button" onClick={restart}>
+              <button className="secondary-button" type="button" onClick={restart}>
                 เริ่มประเมินใหม่
               </button>
             </div>

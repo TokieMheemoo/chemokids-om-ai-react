@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react'
-import type { AiImageAnalysis } from './types'
 import './App.css'
 
 type Screen = 'welcome' | 'upload' | 'questions' | 'analyzing' | 'result'
@@ -17,6 +16,22 @@ type Result = {
   summary: string
   recommendation: string
   badge: string
+}
+
+type AiImageAnalysis = {
+  imageQuality: 'good' | 'poor' | 'unclear'
+  visibleMouthArea: boolean
+  possibleRedness: boolean | null
+  possibleUlcer: boolean | null
+  possibleBleeding: boolean | null
+  confidence: number
+  imageObservationTh: string
+  safetyNoteTh: string
+}
+
+type AnalyzeApiResponse = Partial<AiImageAnalysis> & {
+  error?: string
+  errorTh?: string
 }
 
 const questions: {
@@ -152,6 +167,58 @@ function confidencePercent(value: number) {
   return `${Math.round(value * 100)}%`
 }
 
+function loadImage(file: File) {
+  return new Promise<HTMLImageElement>((resolve, reject) => {
+    const imageUrl = URL.createObjectURL(file)
+    const imageElement = new Image()
+
+    imageElement.onload = () => {
+      URL.revokeObjectURL(imageUrl)
+      resolve(imageElement)
+    }
+
+    imageElement.onerror = () => {
+      URL.revokeObjectURL(imageUrl)
+      reject(new Error('ไม่สามารถอ่านไฟล์รูปภาพได้'))
+    }
+
+    imageElement.src = imageUrl
+  })
+}
+
+async function resizeImageToDataUrl(file: File) {
+  if (!file.type.startsWith('image/')) {
+    throw new Error('ไฟล์ที่อัปโหลดต้องเป็นรูปภาพเท่านั้น')
+  }
+
+  const imageElement = await loadImage(file)
+
+  const maxSide = 768
+  const originalWidth = imageElement.naturalWidth || imageElement.width
+  const originalHeight = imageElement.naturalHeight || imageElement.height
+  const scale = Math.min(1, maxSide / Math.max(originalWidth, originalHeight))
+
+  const canvas = document.createElement('canvas')
+  canvas.width = Math.max(1, Math.round(originalWidth * scale))
+  canvas.height = Math.max(1, Math.round(originalHeight * scale))
+
+  const context = canvas.getContext('2d')
+
+  if (!context) {
+    throw new Error('ไม่สามารถเตรียมรูปภาพก่อนส่ง AI ได้')
+  }
+
+  context.drawImage(imageElement, 0, 0, canvas.width, canvas.height)
+
+  const imageDataUrl = canvas.toDataURL('image/jpeg', 0.65)
+
+  if (imageDataUrl.length > 3_500_000) {
+    throw new Error('รูปภาพยังมีขนาดใหญ่เกินไป กรุณาถ่ายใหม่หรือเลือกรูปที่เล็กลง')
+  }
+
+  return imageDataUrl
+}
+
 function App() {
   const [screen, setScreen] = useState<Screen>('welcome')
   const [image, setImage] = useState<File | null>(null)
@@ -224,15 +291,35 @@ function App() {
       throw new Error('กรุณาอัปโหลดภาพก่อนวิเคราะห์')
     }
 
-    const formData = new FormData()
-    formData.append('image', image)
+    const imageDataUrl = await resizeImageToDataUrl(image)
 
     const response = await fetch('/api/analyze-mouth', {
       method: 'POST',
-      body: formData,
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        imageDataUrl,
+        fileName: image.name,
+        originalFileSize: image.size,
+      }),
     })
 
-    const data = await response.json()
+    const rawText = await response.text()
+
+    let data: AnalyzeApiResponse
+
+    try {
+      data = JSON.parse(rawText) as AnalyzeApiResponse
+    } catch {
+      if (rawText.toLowerCase().includes('request entity too large')) {
+        throw new Error('รูปภาพมีขนาดใหญ่เกินไป กรุณาถ่ายใหม่หรือเลือกรูปที่เล็กลง')
+      }
+
+      throw new Error(
+        rawText || 'API ส่งผลลัพธ์กลับมาไม่ถูกต้อง กรุณาดู error ใน Terminal',
+      )
+    }
 
     if (!response.ok) {
       throw new Error(data.errorTh || data.error || 'AI วิเคราะห์ภาพไม่สำเร็จ')
@@ -451,7 +538,7 @@ function App() {
 
               <div className="process-box">
                 <strong>กำลังประมวลผล</strong>
-                <p>1. ตรวจคุณภาพภาพถ่าย</p>
+                <p>1. เตรียมและบีบอัดภาพก่อนส่งวิเคราะห์</p>
                 <p>2. วิเคราะห์รอยแดง แผล หรือเลือดออกที่อาจเห็นได้</p>
                 <p>3. รวมผลกับแบบสอบถามอาการ</p>
               </div>

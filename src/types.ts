@@ -14,3 +14,22 @@ export type Result = {
   recommendation: string
   badge: string
 }
+
+export type Question = {
+  id: keyof Answers
+  title: string
+  subtitle: string
+  yes: string
+  no: string
+}
+
+export type AiImageAnalysis = {
+  imageQuality: 'good' | 'poor' | 'unclear'
+  visibleMouthArea: boolean
+  possibleRedness: boolean | null
+  possibleUlcer: boolean | null
+  possibleBleeding: boolean | null
+  confidence: number
+  imageObservationTh: string
+  safetyNoteTh: string
+}

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react'
+import type { AiImageAnalysis } from './types'
 import './App.css'
 
 type Screen = 'welcome' | 'upload' | 'questions' | 'analyzing' | 'result'
@@ -135,10 +136,28 @@ function TopBar({ step }: { step: number }) {
   )
 }
 
+function qualityText(value: AiImageAnalysis['imageQuality']) {
+  if (value === 'good') return 'ดี'
+  if (value === 'poor') return 'ไม่ชัด'
+  return 'ไม่แน่ชัด'
+}
+
+function yesNoMaybe(value: boolean | null) {
+  if (value === true) return 'อาจพบ'
+  if (value === false) return 'ไม่พบชัดเจน'
+  return 'ไม่แน่ชัด'
+}
+
+function confidencePercent(value: number) {
+  return `${Math.round(value * 100)}%`
+}
+
 function App() {
   const [screen, setScreen] = useState<Screen>('welcome')
   const [image, setImage] = useState<File | null>(null)
   const [answers, setAnswers] = useState<Answers>({})
+  const [aiAnalysis, setAiAnalysis] = useState<AiImageAnalysis | null>(null)
+  const [aiError, setAiError] = useState('')
 
   const galleryInputRef = useRef<HTMLInputElement | null>(null)
   const cameraInputRef = useRef<HTMLInputElement | null>(null)
@@ -173,6 +192,8 @@ function App() {
 
     if (file) {
       setImage(file)
+      setAiAnalysis(null)
+      setAiError('')
     }
 
     event.target.value = ''
@@ -194,14 +215,52 @@ function App() {
     setScreen('welcome')
     setImage(null)
     setAnswers({})
+    setAiAnalysis(null)
+    setAiError('')
   }
 
-  function goAnalyze() {
-    setScreen('analyzing')
+  async function analyzeImageWithOpenAI() {
+    if (!image) {
+      throw new Error('กรุณาอัปโหลดภาพก่อนวิเคราะห์')
+    }
 
-    analyzeTimerRef.current = window.setTimeout(() => {
-      setScreen('result')
-    }, 1600)
+    const formData = new FormData()
+    formData.append('image', image)
+
+    const response = await fetch('/api/analyze-mouth', {
+      method: 'POST',
+      body: formData,
+    })
+
+    const data = await response.json()
+
+    if (!response.ok) {
+      throw new Error(data.errorTh || data.error || 'AI วิเคราะห์ภาพไม่สำเร็จ')
+    }
+
+    return data as AiImageAnalysis
+  }
+
+  async function goAnalyze() {
+    setScreen('analyzing')
+    setAiAnalysis(null)
+    setAiError('')
+
+    const startTime = Date.now()
+
+    try {
+      const analysis = await analyzeImageWithOpenAI()
+      setAiAnalysis(analysis)
+    } catch (error) {
+      setAiError(error instanceof Error ? error.message : 'AI วิเคราะห์ภาพไม่สำเร็จ')
+    } finally {
+      const elapsed = Date.now() - startTime
+      const remainingDelay = Math.max(400, 1500 - elapsed)
+
+      analyzeTimerRef.current = window.setTimeout(() => {
+        setScreen('result')
+      }, remainingDelay)
+    }
   }
 
   return (
@@ -223,7 +282,7 @@ function App() {
               </p>
 
               <div className="feature-card">📷 ถ่ายหรืออัปโหลดภาพช่องปาก</div>
-              <div className="feature-card">✨ จำลอง AI วิเคราะห์ร่วมกับแบบสอบถาม</div>
+              <div className="feature-card">✨ AI วิเคราะห์ภาพเป็นข้อมูลเสริม</div>
               <div className="feature-card">📱 ออกแบบสำหรับใช้งานบนมือถือ</div>
             </div>
 
@@ -387,13 +446,13 @@ function App() {
               <h2 className="screen-title">AI กำลังวิเคราะห์</h2>
 
               <p className="description small center">
-                ระบบจำลองการตรวจรอยแดง แผล และข้อมูลอาการ เพื่อประเมินระดับความรุนแรงเบื้องต้น
+                ระบบกำลังอ่านภาพช่องปากร่วมกับแบบสอบถาม เพื่อสร้างข้อมูลประเมินเบื้องต้น
               </p>
 
               <div className="process-box">
                 <strong>กำลังประมวลผล</strong>
                 <p>1. ตรวจคุณภาพภาพถ่าย</p>
-                <p>2. วิเคราะห์สัญญาณที่เกี่ยวข้องกับ Oral Mucositis</p>
+                <p>2. วิเคราะห์รอยแดง แผล หรือเลือดออกที่อาจเห็นได้</p>
                 <p>3. รวมผลกับแบบสอบถามอาการ</p>
               </div>
             </div>
@@ -421,6 +480,55 @@ function App() {
                 <h3>คำแนะนำเบื้องต้น</h3>
                 <p>{result.recommendation}</p>
               </div>
+
+              {aiAnalysis && (
+                <div className="result-card">
+                  <h3>ผลวิเคราะห์ภาพโดย AI</h3>
+
+                  <p>
+                    <strong>คุณภาพภาพ:</strong> {qualityText(aiAnalysis.imageQuality)}
+                  </p>
+
+                  <p>
+                    <strong>เห็นบริเวณช่องปาก:</strong>{' '}
+                    {aiAnalysis.visibleMouthArea ? 'เห็น' : 'ไม่ชัดเจน'}
+                  </p>
+
+                  <p>
+                    <strong>รอยแดงจากภาพ:</strong> {yesNoMaybe(aiAnalysis.possibleRedness)}
+                  </p>
+
+                  <p>
+                    <strong>แผลจากภาพ:</strong> {yesNoMaybe(aiAnalysis.possibleUlcer)}
+                  </p>
+
+                  <p>
+                    <strong>เลือดออกจากภาพ:</strong> {yesNoMaybe(aiAnalysis.possibleBleeding)}
+                  </p>
+
+                  <p>
+                    <strong>ความมั่นใจ:</strong> {confidencePercent(aiAnalysis.confidence)}
+                  </p>
+
+                  <p>
+                    <strong>ข้อสังเกต:</strong> {aiAnalysis.imageObservationTh}
+                  </p>
+
+                  <p>
+                    <strong>หมายเหตุ:</strong> {aiAnalysis.safetyNoteTh}
+                  </p>
+                </div>
+              )}
+
+              {aiError && (
+                <div className="danger-box">
+                  <h3>AI วิเคราะห์ภาพไม่สำเร็จ</h3>
+                  <p>{aiError}</p>
+                  <p>
+                    ระบบยังสามารถแสดง Grade จากแบบสอบถามได้ตามปกติ แต่ผลภาพจาก AI จะยังไม่ถูกนำมาแสดง
+                  </p>
+                </div>
+              )}
 
               <div className="danger-box">
                 <h3>หมายเหตุสำคัญ</h3>

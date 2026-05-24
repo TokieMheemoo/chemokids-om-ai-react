@@ -316,9 +316,7 @@ function App() {
         throw new Error('รูปภาพมีขนาดใหญ่เกินไป กรุณาถ่ายใหม่หรือเลือกรูปที่เล็กลง')
       }
 
-      throw new Error(
-        rawText || 'API ส่งผลลัพธ์กลับมาไม่ถูกต้อง กรุณาดู error ใน Terminal',
-      )
+      throw new Error(rawText || 'API ส่งผลลัพธ์กลับมาไม่ถูกต้อง กรุณาดู error ใน Terminal')
     }
 
     if (!response.ok) {
@@ -569,41 +567,91 @@ function App() {
               </div>
 
               {aiAnalysis && (
-                <div className="result-card">
-                  <h3>ผลวิเคราะห์ภาพโดย AI</h3>
+                <div className="ai-feature-card">
+                  <div className="ai-card-header">
+                    <div className="ai-orb">✨</div>
 
-                  <p>
-                    <strong>คุณภาพภาพ:</strong> {qualityText(aiAnalysis.imageQuality)}
-                  </p>
+                    <div>
+                      <p className="ai-kicker">AI Vision Support</p>
+                      <h3>ผลวิเคราะห์ภาพโดย AI</h3>
+                      <p>
+                        ระบบอ่านภาพช่องปากเป็นข้อมูลเสริมร่วมกับแบบสอบถาม
+                        โดยยังไม่ใช้ AI เป็นการวินิจฉัยแทนแพทย์
+                      </p>
+                    </div>
+                  </div>
 
-                  <p>
-                    <strong>เห็นบริเวณช่องปาก:</strong>{' '}
-                    {aiAnalysis.visibleMouthArea ? 'เห็น' : 'ไม่ชัดเจน'}
-                  </p>
+                  <div className="ai-confidence">
+                    <div>
+                      <span>ความมั่นใจของ AI</span>
+                      <strong>{confidencePercent(aiAnalysis.confidence)}</strong>
+                    </div>
 
-                  <p>
-                    <strong>รอยแดงจากภาพ:</strong> {yesNoMaybe(aiAnalysis.possibleRedness)}
-                  </p>
+                    <div className="ai-confidence-bar">
+                      <div style={{ width: confidencePercent(aiAnalysis.confidence) }} />
+                    </div>
+                  </div>
 
-                  <p>
-                    <strong>แผลจากภาพ:</strong> {yesNoMaybe(aiAnalysis.possibleUlcer)}
-                  </p>
+                  <div className="ai-metric-grid">
+                    <div className="ai-metric">
+                      <span>คุณภาพภาพ</span>
+                      <strong>{qualityText(aiAnalysis.imageQuality)}</strong>
+                    </div>
 
-                  <p>
-                    <strong>เลือดออกจากภาพ:</strong> {yesNoMaybe(aiAnalysis.possibleBleeding)}
-                  </p>
+                    <div className="ai-metric">
+                      <span>บริเวณช่องปาก</span>
+                      <strong>{aiAnalysis.visibleMouthArea ? 'เห็น' : 'ไม่ชัดเจน'}</strong>
+                    </div>
 
-                  <p>
-                    <strong>ความมั่นใจ:</strong> {confidencePercent(aiAnalysis.confidence)}
-                  </p>
+                    <div
+                      className={`ai-metric ${
+                        aiAnalysis.possibleRedness === true
+                          ? 'warning'
+                          : aiAnalysis.possibleRedness === false
+                            ? 'safe'
+                            : 'neutral'
+                      }`}
+                    >
+                      <span>รอยแดง</span>
+                      <strong>{yesNoMaybe(aiAnalysis.possibleRedness)}</strong>
+                    </div>
 
-                  <p>
-                    <strong>ข้อสังเกต:</strong> {aiAnalysis.imageObservationTh}
-                  </p>
+                    <div
+                      className={`ai-metric ${
+                        aiAnalysis.possibleUlcer === true
+                          ? 'warning'
+                          : aiAnalysis.possibleUlcer === false
+                            ? 'safe'
+                            : 'neutral'
+                      }`}
+                    >
+                      <span>แผล</span>
+                      <strong>{yesNoMaybe(aiAnalysis.possibleUlcer)}</strong>
+                    </div>
 
-                  <p>
-                    <strong>หมายเหตุ:</strong> {aiAnalysis.safetyNoteTh}
-                  </p>
+                    <div
+                      className={`ai-metric ${
+                        aiAnalysis.possibleBleeding === true
+                          ? 'danger'
+                          : aiAnalysis.possibleBleeding === false
+                            ? 'safe'
+                            : 'neutral'
+                      }`}
+                    >
+                      <span>เลือดออก</span>
+                      <strong>{yesNoMaybe(aiAnalysis.possibleBleeding)}</strong>
+                    </div>
+                  </div>
+
+                  <div className="ai-observation">
+                    <h4>ข้อสังเกตจากภาพ</h4>
+                    <p>{aiAnalysis.imageObservationTh}</p>
+                  </div>
+
+                  <div className="ai-safety-note">
+                    <span>หมายเหตุ</span>
+                    <p>{aiAnalysis.safetyNoteTh}</p>
+                  </div>
                 </div>
               )}
 

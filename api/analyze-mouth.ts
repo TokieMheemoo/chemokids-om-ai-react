@@ -1,8 +1,4 @@
 import OpenAI from 'openai'
-import { Buffer } from 'node:buffer'
-
-export const runtime = 'nodejs'
-export const maxDuration = 30
 
 type AiImageAnalysis = {
   imageQuality: 'good' | 'poor' | 'unclear'
@@ -15,15 +11,41 @@ type AiImageAnalysis = {
   safetyNoteTh: string
 }
 
-const MAX_IMAGE_SIZE_BYTES = 8 * 1024 * 1024
+type AnalyzeRequestBody = {
+  imageDataUrl?: string
+  fileName?: string
+  originalFileSize?: number
+}
 
-function jsonResponse(data: unknown, status = 200) {
-  return new Response(JSON.stringify(data), {
-    status,
-    headers: {
-      'Content-Type': 'application/json; charset=utf-8',
-    },
-  })
+type VercelRequestLike = {
+  method?: string
+  body?: unknown
+}
+
+type VercelResponseLike = {
+  status: (statusCode: number) => {
+    json: (data: unknown) => void
+  }
+}
+
+const MAX_DATA_URL_LENGTH = 3_800_000
+
+function sendJson(response: VercelResponseLike, statusCode: number, data: unknown) {
+  return response.status(statusCode).json(data)
+}
+
+function getRequestBody(request: VercelRequestLike): AnalyzeRequestBody {
+  if (!request.body) return {}
+
+  if (typeof request.body === 'string') {
+    return JSON.parse(request.body) as AnalyzeRequestBody
+  }
+
+  if (typeof request.body === 'object') {
+    return request.body as AnalyzeRequestBody
+  }
+
+  return {}
 }
 
 function normalizeBooleanOrNull(value: unknown): boolean | null {
@@ -52,95 +74,141 @@ function normalizeConfidence(value: unknown): number {
   return Math.max(0, Math.min(1, value))
 }
 
-function parseAiJson(text: string): AiImageAnalysis {
-  const cleaned = text.replace(/```json|```/g, '').trim()
-  const parsed = JSON.parse(cleaned) as Record<string, unknown>
-
+function fallbackAnalysis(note: string): AiImageAnalysis {
   return {
-    imageQuality: normalizeQuality(parsed.imageQuality),
-    visibleMouthArea: parsed.visibleMouthArea === true,
-    possibleRedness: normalizeBooleanOrNull(parsed.possibleRedness),
-    possibleUlcer: normalizeBooleanOrNull(parsed.possibleUlcer),
-    possibleBleeding: normalizeBooleanOrNull(parsed.possibleBleeding),
-    confidence: normalizeConfidence(parsed.confidence),
-    imageObservationTh:
-      typeof parsed.imageObservationTh === 'string'
-        ? parsed.imageObservationTh
-        : 'ไม่สามารถสรุปรายละเอียดจากภาพได้ชัดเจน',
+    imageQuality: 'unclear',
+    visibleMouthArea: false,
+    possibleRedness: null,
+    possibleUlcer: null,
+    possibleBleeding: null,
+    confidence: 0,
+    imageObservationTh: note,
     safetyNoteTh:
-      typeof parsed.safetyNoteTh === 'string'
-        ? parsed.safetyNoteTh
-        : 'ผลนี้เป็นเพียงข้อมูลเสริม ไม่ใช่การวินิจฉัยแทนบุคลากรทางการแพทย์',
+      'ผลนี้เป็นเพียงข้อมูลเสริม ไม่ใช่การวินิจฉัยแทนบุคลากรทางการแพทย์',
   }
 }
 
-async function handleAnalyze(request: Request) {
-  if (request.method !== 'POST') {
-    return jsonResponse(
-      {
-        error: 'Method not allowed',
-        errorTh: 'รองรับเฉพาะการส่งข้อมูลแบบ POST เท่านั้น',
-      },
-      405,
+function parseAiJson(text: string): AiImageAnalysis {
+  try {
+    const cleaned = text.replace(/```json|```/g, '').trim()
+    const parsed = JSON.parse(cleaned) as Record<string, unknown>
+
+    return {
+      imageQuality: normalizeQuality(parsed.imageQuality),
+      visibleMouthArea: parsed.visibleMouthArea === true,
+      possibleRedness: normalizeBooleanOrNull(parsed.possibleRedness),
+      possibleUlcer: normalizeBooleanOrNull(parsed.possibleUlcer),
+      possibleBleeding: normalizeBooleanOrNull(parsed.possibleBleeding),
+      confidence: normalizeConfidence(parsed.confidence),
+      imageObservationTh:
+        typeof parsed.imageObservationTh === 'string'
+          ? parsed.imageObservationTh
+          : 'ไม่สามารถสรุปรายละเอียดจากภาพได้ชัดเจน',
+      safetyNoteTh:
+        typeof parsed.safetyNoteTh === 'string'
+          ? parsed.safetyNoteTh
+          : 'ผลนี้เป็นเพียงข้อมูลเสริม ไม่ใช่การวินิจฉัยแทนบุคลากรทางการแพทย์',
+    }
+  } catch {
+    return fallbackAnalysis(
+      'AI วิเคราะห์ภาพได้ แต่ผลลัพธ์ที่ส่งกลับมายังไม่อยู่ในรูปแบบที่ระบบอ่านได้ชัดเจน กรุณาลองใหม่อีกครั้ง',
     )
+  }
+}
+
+function getErrorMessage(error: unknown) {
+  if (error instanceof Error) {
+    return error.message
+  }
+
+  if (typeof error === 'string') {
+    return error
+  }
+
+  try {
+    return JSON.stringify(error)
+  } catch {
+    return 'Unknown error'
+  }
+}
+
+function getThaiErrorMessage(error: unknown) {
+  const message = getErrorMessage(error)
+  const lower = message.toLowerCase()
+
+  if (lower.includes('api key') || lower.includes('401') || lower.includes('unauthorized')) {
+    return 'OpenAI API Key ไม่ถูกต้อง หรือยังไม่ได้ตั้งค่า OPENAI_API_KEY ใน Vercel'
+  }
+
+  if (lower.includes('quota') || lower.includes('billing') || lower.includes('insufficient')) {
+    return 'OpenAI API ใช้งานไม่ได้ เพราะเครดิต/โควต้า/ระบบ Billing อาจยังไม่พร้อม'
+  }
+
+  if (lower.includes('model') || lower.includes('does not exist')) {
+    return 'ชื่อโมเดล OpenAI ไม่ถูกต้อง หรือบัญชีนี้ยังไม่มีสิทธิ์ใช้โมเดลที่ตั้งไว้'
+  }
+
+  if (lower.includes('rate limit')) {
+    return 'OpenAI API ถูกจำกัดจำนวนการเรียกชั่วคราว กรุณาลองใหม่อีกครั้ง'
+  }
+
+  if (lower.includes('request entity too large') || lower.includes('payload too large')) {
+    return 'รูปภาพมีขนาดใหญ่เกินไป กรุณาถ่ายใหม่หรือเลือกรูปที่เล็กลง'
+  }
+
+  return `AI วิเคราะห์ภาพไม่สำเร็จ: ${message.slice(0, 180)}`
+}
+
+export default async function handler(request: VercelRequestLike, response: VercelResponseLike) {
+  if (request.method !== 'POST') {
+    return sendJson(response, 405, {
+      error: 'Method not allowed',
+      errorTh: 'รองรับเฉพาะการส่งข้อมูลแบบ POST เท่านั้น',
+    })
   }
 
   const apiKey = process.env.OPENAI_API_KEY
 
   if (!apiKey) {
-    return jsonResponse(
-      {
-        error: 'OPENAI_API_KEY is missing',
-        errorTh: 'ยังไม่ได้ตั้งค่า OPENAI_API_KEY ในระบบ',
-      },
-      500,
-    )
+    return sendJson(response, 500, {
+      error: 'OPENAI_API_KEY is missing',
+      errorTh: 'ยังไม่ได้ตั้งค่า OPENAI_API_KEY ใน Vercel',
+    })
   }
 
   try {
-    const formData = await request.formData()
-    const image = formData.get('image')
+    const body = getRequestBody(request)
+    const imageDataUrl = body.imageDataUrl
 
-    if (!(image instanceof File)) {
-      return jsonResponse(
-        {
-          error: 'Image is required',
-          errorTh: 'กรุณาอัปโหลดภาพก่อนวิเคราะห์',
-        },
-        400,
-      )
+    if (!imageDataUrl) {
+      return sendJson(response, 400, {
+        error: 'Image is required',
+        errorTh: 'กรุณาอัปโหลดภาพก่อนวิเคราะห์',
+      })
     }
 
-    if (!image.type.startsWith('image/')) {
-      return jsonResponse(
-        {
-          error: 'Invalid file type',
-          errorTh: 'ไฟล์ที่อัปโหลดต้องเป็นรูปภาพเท่านั้น',
-        },
-        400,
-      )
+    if (!imageDataUrl.startsWith('data:image/')) {
+      return sendJson(response, 400, {
+        error: 'Invalid image format',
+        errorTh: 'รูปภาพที่ส่งมาไม่ถูกต้อง',
+      })
     }
 
-    if (image.size > MAX_IMAGE_SIZE_BYTES) {
-      return jsonResponse(
-        {
-          error: 'Image is too large',
-          errorTh: 'รูปภาพมีขนาดใหญ่เกินไป กรุณาใช้ไฟล์ไม่เกิน 8MB',
-        },
-        400,
-      )
+    if (imageDataUrl.length > MAX_DATA_URL_LENGTH) {
+      return sendJson(response, 400, {
+        error: 'Image is too large',
+        errorTh: 'รูปภาพมีขนาดใหญ่เกินไป กรุณาลองเลือกรูปที่เล็กลงหรือถ่ายใหม่',
+      })
     }
 
     const openai = new OpenAI({
       apiKey,
     })
 
-    const arrayBuffer = await image.arrayBuffer()
-    const base64Image = Buffer.from(arrayBuffer).toString('base64')
-    const dataUrl = `data:${image.type};base64,${base64Image}`
+    const model = process.env.OPENAI_MODEL || 'gpt-4.1-mini'
 
-    const response = await openai.responses.create({
-      model: process.env.OPENAI_MODEL || 'gpt-4.1-mini',
+    const aiResponse = await openai.responses.create({
+      model,
       input: [
         {
           role: 'user',
@@ -182,7 +250,7 @@ Rules:
             },
             {
               type: 'input_image',
-              image_url: dataUrl,
+              image_url: imageDataUrl,
               detail: 'low',
             },
           ],
@@ -190,29 +258,15 @@ Rules:
       ],
     })
 
-    const analysis = parseAiJson(response.output_text)
+    const analysis = parseAiJson(aiResponse.output_text)
 
-    return jsonResponse(analysis)
+    return sendJson(response, 200, analysis)
   } catch (error) {
     console.error('analyze-mouth error:', error)
 
-    return jsonResponse(
-      {
-        error: 'Failed to analyze image',
-        errorTh:
-          'AI วิเคราะห์ภาพไม่สำเร็จ กรุณาลองใหม่ หรือใช้ผลจากแบบสอบถามเบื้องต้น',
-      },
-      500,
-    )
+    return sendJson(response, 500, {
+      error: getErrorMessage(error),
+      errorTh: getThaiErrorMessage(error),
+    })
   }
-}
-
-export function POST(request: Request) {
-  return handleAnalyze(request)
-}
-
-export default {
-  fetch(request: Request) {
-    return handleAnalyze(request)
-  },
 }
